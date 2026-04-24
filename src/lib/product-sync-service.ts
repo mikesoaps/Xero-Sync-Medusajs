@@ -39,6 +39,9 @@ const asRecord = (value: unknown) => {
   return null
 }
 
+// Account code "200" is the standard Sales/Revenue account in Xero's default chart of accounts.
+// This is used as a fallback when no income account is configured in the plugin settings.
+// Override via the Xero Settings page in the admin UI.
 export const DEFAULT_INCOME_ACCOUNT_CODE = "200"
 
 export async function getReadyXeroConnection(

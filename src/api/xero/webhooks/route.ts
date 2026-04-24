@@ -62,7 +62,9 @@ const processWebhookPayload = async (scope: MedusaRequest["scope"], payload: Xer
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const webhookKey = getWebhookVerifierToken()
   const rawBody = req.rawBody || ""
-  const signature = req.get?.("x-xero-signature") ?? (typeof req.headers?.["x-xero-signature"] === "string" ? req.headers["x-xero-signature"] : Array.isArray(req.headers?.["x-xero-signature"]) ? req.headers["x-xero-signature"][0] : null)
+
+  const sigHeader = req.headers?.["x-xero-signature"]
+  const signature = typeof sigHeader === "string" ? sigHeader : Array.isArray(sigHeader) ? sigHeader[0] : null
 
   if (!webhookKey) {
     return res.status(401).json({ message: "Xero webhook key is not configured." })

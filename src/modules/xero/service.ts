@@ -1,0 +1,151 @@
+import { MedusaService } from "@medusajs/framework/utils"
+
+import XeroConnection from "./models/xero-connection"
+import XeroContactLink from "./models/xero-contact-link"
+import XeroInvoiceLink from "./models/xero-invoice-link"
+
+type UpsertConnectionInput = {
+  tenant_id: string | null
+  access_token: string | null
+  refresh_token: string | null
+  token_type: string | null
+  expires_at?: Date | null
+  refresh_token_expires_at?: Date | null
+  raw_token?: Record<string, unknown> | null
+  connected_at?: Date | null
+  disconnected_at?: Date | null
+  xero_product_income_account_id?: string | null
+  xero_product_income_account_name?: string | null
+  updated_by?: string | null
+}
+
+export const XERO_MODULE = "xero"
+
+class XeroModuleService extends MedusaService({
+  XeroConnection,
+  XeroContactLink,
+  XeroInvoiceLink,
+}) {
+  async getConnection() {
+    const connections = await this.listXeroConnections({
+      provider: "xero",
+    })
+    return connections[0] ?? null
+  }
+
+  async upsertConnection(input: UpsertConnectionInput) {
+    const existing = await this.getConnection()
+    if (existing) {
+      return await this.updateXeroConnections({
+        id: existing.id,
+        provider: "xero",
+        ...input,
+      })
+    }
+    return await this.createXeroConnections({
+      provider: "xero",
+      ...input,
+    })
+  }
+
+  async clearConnection(updatedBy?: string | null) {
+    const existing = await this.getConnection()
+    if (!existing) return null
+    return await this.updateXeroConnections({
+      id: existing.id,
+      access_token: null,
+      refresh_token: null,
+      token_type: null,
+      tenant_id: null,
+      expires_at: null,
+      refresh_token_expires_at: null,
+      raw_token: null,
+      disconnected_at: new Date(),
+      xero_product_income_account_id: null,
+      xero_product_income_account_name: null,
+      updated_by: updatedBy ?? null,
+    })
+  }
+
+  async getContactLinkByMedusaCustomerId(medusaCustomerId: string) {
+    const links = await this.listXeroContactLinks({ medusa_customer_id: medusaCustomerId })
+    return links[0] ?? null
+  }
+
+  async getContactLinkByXeroContactId(xeroContactId: string) {
+    const links = await this.listXeroContactLinks({ xero_contact_id: xeroContactId })
+    return links[0] ?? null
+  }
+
+  async upsertContactLink(input: {
+    medusa_customer_id: string
+    xero_contact_id: string
+    xero_update_token?: string | null
+    tenant_id?: string | null
+    last_synced_hash?: string | null
+    last_direction?: string | null
+    last_synced_at?: Date | null
+    metadata?: Record<string, unknown> | null
+  }) {
+    const existing =
+      (await this.getContactLinkByMedusaCustomerId(input.medusa_customer_id)) ||
+      (await this.getContactLinkByXeroContactId(input.xero_contact_id))
+
+    if (existing) {
+      return await this.updateXeroContactLinks({ id: existing.id, ...input })
+    }
+    return await this.createXeroContactLinks(input)
+  }
+
+  async getInvoiceLinkByMedusaOrderId(medusaOrderId: string) {
+    const links = await this.listXeroInvoiceLinks({ medusa_order_id: medusaOrderId })
+    return links[0] ?? null
+  }
+
+  async getInvoiceLinkByXeroInvoiceId(xeroInvoiceId: string) {
+    const links = await this.listXeroInvoiceLinks({ xero_invoice_id: xeroInvoiceId })
+    return links[0] ?? null
+  }
+
+  async upsertInvoiceLink(input: {
+    medusa_order_id: string
+    xero_invoice_id?: string | null
+    xero_update_token?: string | null
+    tenant_id?: string | null
+    sync_type?: string | null
+    last_synced_hash?: string | null
+    last_synced_at?: Date | null
+    metadata?: Record<string, unknown> | null
+  }) {
+    const existing =
+      (await this.getInvoiceLinkByMedusaOrderId(input.medusa_order_id)) ||
+      (input.xero_invoice_id
+        ? await this.getInvoiceLinkByXeroInvoiceId(input.xero_invoice_id)
+        : null)
+
+    if (existing) {
+      return await this.updateXeroInvoiceLinks({ id: existing.id, ...input })
+    }
+    return await this.createXeroInvoiceLinks(input)
+  }
+
+  async clearInvoiceLinks() {
+    const [links] = await this.listAndCountXeroInvoiceLinks({}, { select: ["id"], take: 5000 })
+    if (links.length > 0) {
+      await this.deleteXeroInvoiceLinks(links.map((l) => l.id))
+    }
+  }
+
+  async clearContactLinks() {
+    const [links] = await this.listAndCountXeroContactLinks({}, { select: ["id"], take: 5000 })
+    if (links.length > 0) {
+      await this.deleteXeroContactLinks(links.map((l) => l.id))
+    }
+  }
+
+  async listInvoiceLinks() {
+    return await this.listXeroInvoiceLinks({})
+  }
+}
+
+export default XeroModuleService

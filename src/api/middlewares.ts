@@ -9,5 +9,12 @@ export default defineMiddlewares({
         preserveRawBody: true,
       },
     },
+    {
+      method: ["POST"],
+      matcher: "/xero/webhooks",
+      bodyParser: {
+        preserveRawBody: true,
+      },
+    },
   ],
 })

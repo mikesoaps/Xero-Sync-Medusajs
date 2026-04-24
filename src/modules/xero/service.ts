@@ -3,6 +3,7 @@ import { MedusaService } from "@medusajs/framework/utils"
 import XeroConnection from "./models/xero-connection"
 import XeroContactLink from "./models/xero-contact-link"
 import XeroInvoiceLink from "./models/xero-invoice-link"
+import XeroItemLink from "./models/xero-item-link"
 
 type UpsertConnectionInput = {
   tenant_id: string | null
@@ -17,6 +18,9 @@ type UpsertConnectionInput = {
   xero_product_income_account_id?: string | null
   xero_product_income_account_name?: string | null
   updated_by?: string | null
+  // Legacy fields accepted but ignored (from QB migration)
+  environment?: string | null
+  scope?: Record<string, unknown> | null
 }
 
 export const XERO_MODULE = "xero"
@@ -25,6 +29,7 @@ class XeroModuleService extends MedusaService({
   XeroConnection,
   XeroContactLink,
   XeroInvoiceLink,
+  XeroItemLink,
 }) {
   async getConnection() {
     const connections = await this.listXeroConnections({
@@ -145,6 +150,52 @@ class XeroModuleService extends MedusaService({
 
   async listInvoiceLinks() {
     return await this.listXeroInvoiceLinks({})
+  }
+
+  async getItemLinkByMedusaProductId(medusaProductId: string) {
+    const links = await this.listXeroItemLinks({ medusa_product_id: medusaProductId })
+    return links[0] ?? null
+  }
+
+  async getItemLinkByXeroItemId(xeroItemId: string) {
+    const links = await this.listXeroItemLinks({ xero_item_id: xeroItemId })
+    return links[0] ?? null
+  }
+
+  async upsertItemLink(input: {
+    medusa_product_id: string
+    xero_item_id: string
+    xero_update_token?: string | null
+    tenant_id?: string | null
+    last_synced_hash?: string | null
+    last_direction?: string | null
+    last_synced_at?: Date | null
+    metadata?: Record<string, unknown> | null
+  }) {
+    const existing =
+      (await this.getItemLinkByMedusaProductId(input.medusa_product_id)) ||
+      (await this.getItemLinkByXeroItemId(input.xero_item_id))
+
+    if (existing) {
+      return await this.updateXeroItemLinks({ id: existing.id, ...input })
+    }
+    return await this.createXeroItemLinks(input)
+  }
+
+  async clearItemLinks() {
+    const [links] = await this.listAndCountXeroItemLinks({}, { select: ["id"], take: 5000 })
+    if (links.length > 0) {
+      await this.deleteXeroItemLinks(links.map((l) => l.id))
+    }
+  }
+
+  async getSettings() {
+    const connection = await this.getConnection()
+    if (!connection) return null
+    return {
+      xero_product_income_account_id: connection.xero_product_income_account_id ?? null,
+      xero_product_income_account_name: connection.xero_product_income_account_name ?? null,
+    }
   }
 }
 

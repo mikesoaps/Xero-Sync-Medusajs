@@ -1,19 +1,19 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 
-import { syncMedusaCustomerToQuickbooks } from "../lib/customer-sync-service"
+import { syncMedusaCustomerToXero } from "../lib/customer-sync-service"
 
 export default async function customerCreatedHandler({
   event: { data },
   container,
 }: SubscriberArgs<{ id: string }>) {
-  const result = await syncMedusaCustomerToQuickbooks(container, data.id)
+  const result = await syncMedusaCustomerToXero(container, data.id)
 
-  console.log("[quickbooks-customer-sync] medusa->quickbooks created", result)
+  console.log("[xero-customer-sync] medusa->xero created", result)
 }
 
 export const config: SubscriberConfig = {
   event: "customer.created",
   context: {
-    subscriberId: "quickbooks-sync-customer-created-handler",
+    subscriberId: "xero-sync-customer-created-handler",
   },
 }

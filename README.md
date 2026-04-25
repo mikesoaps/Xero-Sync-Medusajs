@@ -5,7 +5,7 @@
 **Sync Medusa.js orders, customers, and products with Xero — in real time.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
-[![Medusa v2](https://img.shields.io/badge/Medusa-v2-blueviolet?style=flat-square)](https://medusajs.com)
+[![Medusa 2.13.6](https://img.shields.io/badge/Medusa-2.13.6-blueviolet?style=flat-square)](https://medusajs.com)
 [![Xero](https://img.shields.io/badge/Xero-API-1AB4D7?style=flat-square)](https://developer.xero.com)
 
 </div>
@@ -29,15 +29,16 @@
 
 ## Requirements
 
-- Medusa v2 (2.x)
+- Medusa 2.13.6 or later
 - Node.js ≥ 20
+- pnpm ≥ 9
 - A [Xero Developer](https://developer.xero.com/) account with an OAuth 2.0 app
 
 ---
 
 ## Local Installation (without publishing to npm)
 
-Because this plugin is not published to npm, you use **[yalc](https://github.com/wclr/yalc)** to link it into your Medusa project locally.
+Medusa supports loading plugins directly from a local path — no package registry needed. See the [Medusa plugin docs](https://docs.medusajs.com/learn/fundamentals/plugins/create) for background.
 
 ### Step 1 — Clone the plugin
 
@@ -49,41 +50,39 @@ cd Xero-Sync-Medusajs
 ### Step 2 — Install dependencies and build
 
 ```bash
-yarn install
-yarn build
+pnpm install
+pnpm build
 ```
 
 > The build output is placed in `.medusa/server`.
 
-### Step 3 — Publish locally with yalc
+### Step 3 — Add the plugin to your Medusa project
+
+From inside your **Medusa project** directory, add the plugin as a local dependency:
 
 ```bash
-# Install yalc globally if you haven't already
-npm install -g yalc
-
-# From inside the plugin directory
-yalc publish
+pnpm add ../Xero-Sync-Medusajs
 ```
 
-### Step 4 — Add the plugin to your Medusa project
+This records `"xero-sync-medusajs": "file:../Xero-Sync-Medusajs"` (relative path) in your project's `package.json` — no npm publishing required.
 
-```bash
-# From inside your Medusa project directory
-yalc add xero-sync-medusajs
-```
+> **Adjust the path** `../Xero-Sync-Medusajs` to wherever you cloned the plugin relative to your Medusa project.
 
-This copies the built plugin into `.yalc/` and registers it in your project's `package.json`. No npm publishing required.
+### Step 4 — Re-building after changes
 
-### Step 5 — Re-building after changes
-
-When you make changes to the plugin source, rebuild and push:
+When you make changes to the plugin source, rebuild it:
 
 ```bash
 # In the plugin directory
-yarn build && yalc push
+pnpm build
 ```
 
-`yalc push` automatically updates all projects that have it linked.
+Then reinstall in your Medusa project so the updated build is picked up:
+
+```bash
+# In your Medusa project directory
+pnpm install
+```
 
 ---
 
@@ -131,7 +130,7 @@ export default defineConfig({
 The plugin creates its own database tables to track sync state. Run migrations after adding the plugin:
 
 ```bash
-npx medusa db:migrate
+pnpm medusa db:migrate
 ```
 
 This creates the following tables:

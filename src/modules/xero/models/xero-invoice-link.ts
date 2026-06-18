@@ -7,8 +7,11 @@ const XeroInvoiceLink = model.define("xero_invoice_link", {
   xero_update_token: model.text().nullable(),
   tenant_id: model.text().nullable(),
   sync_type: model.text().nullable(),
+  sync_status: model.text().default("pending"),
+  xero_status: model.text().nullable(),
   last_synced_hash: model.text().nullable(),
   last_synced_at: model.dateTime().nullable(),
+  last_error: model.text().nullable(),
   metadata: model.json().nullable(),
 })
 

@@ -1,4 +1,4 @@
-export const QUICKBOOKS_INVENTORY_SOURCE_OF_TRUTH = "medusa"
+import { createHash } from "crypto"
 
 const asRecord = (value: unknown) => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -8,91 +8,89 @@ const asRecord = (value: unknown) => {
   return null
 }
 
-export const QUICKBOOKS_ITEM_INVENTORY_FIELDS = [
-  "QtyOnHand",
-  "TrackQtyOnHand",
-  "InvStartDate",
-  "AssetAccountRef",
-  "ExpenseAccountRef",
-  "IncomeAccountRef",
-  "PurchaseCost",
-  "Type",
-] as const
+export const normalizeSku = (value: unknown) =>
+  typeof value === "string" ? value.trim().toUpperCase() : ""
 
-export const MEDUSA_QUICKBOOKS_IMAGE_NOTE_PREFIX = "medusa-image-sync:"
-
-export function quickbooksItemHasInventoryFields(item: Record<string, unknown>) {
-  return QUICKBOOKS_ITEM_INVENTORY_FIELDS.some((field) => field in item)
+export const normalizeAmount = (value: unknown) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
 }
 
-export function quickbooksItemInventorySnapshot(item: Record<string, unknown>) {
+export const normalizeXeroItemForSync = (item: Record<string, unknown>) => {
+  const salesDetails = asRecord(item.salesDetails)
+
   return {
-    type: item.Type ?? null,
-    track_qty_on_hand: item.TrackQtyOnHand ?? null,
-    qty_on_hand: item.QtyOnHand ?? null,
-    inv_start_date: item.InvStartDate ?? null,
-    purchase_cost: item.PurchaseCost ?? null,
-    income_account_ref: asRecord(item.IncomeAccountRef) ?? null,
-    expense_account_ref: asRecord(item.ExpenseAccountRef) ?? null,
-    asset_account_ref: asRecord(item.AssetAccountRef) ?? null,
+    sku: normalizeSku(item.code),
+    name: typeof item.name === "string" ? item.name.trim() : "",
+    description:
+      typeof item.description === "string" ? item.description.trim() : "",
+    price: normalizeAmount(asRecord(salesDetails)?.unitPrice),
   }
 }
 
-export function isQuickbooksImageAttachable(attachable: Record<string, unknown>) {
-  const contentType =
-    typeof attachable.ContentType === "string"
-      ? attachable.ContentType.toLowerCase()
-      : ""
-  const fileName =
-    typeof attachable.FileName === "string"
-      ? attachable.FileName.toLowerCase()
-      : ""
-
-  return (
-    contentType.startsWith("image/") ||
-    /\.(jpg|jpeg|png|gif|tif|tiff)$/i.test(fileName)
+export const normalizeMedusaProductForSync = (
+  product: Record<string, unknown>
+) => {
+  const variants = Array.isArray(product.variants) ? product.variants : []
+  const firstVariant = asRecord(variants[0])
+  const prices = Array.isArray(firstVariant?.prices) ? firstVariant.prices : []
+  const usdPrice = prices.find(
+    (p) => asRecord(p)?.currency_code === "usd"
   )
-}
-
-export function buildMedusaImageAttachableNote(input: {
-  medusa_product_id: string
-  medusa_image_url: string
-}) {
-  return `${MEDUSA_QUICKBOOKS_IMAGE_NOTE_PREFIX}${JSON.stringify(input)}`
-}
-
-export function isPluginManagedQuickbooksImageAttachable(
-  attachable: Record<string, unknown>,
-  medusaProductId?: string
-) {
-  const note = typeof attachable.Note === "string" ? attachable.Note : ""
-
-  if (!note.startsWith(MEDUSA_QUICKBOOKS_IMAGE_NOTE_PREFIX)) {
-    return false
-  }
-
-  if (!medusaProductId) {
-    return true
-  }
-
-  return note.includes(`"medusa_product_id":"${medusaProductId}"`)
-}
-
-export function shouldSkipQuickbooksItemWebhook(item: Record<string, unknown>) {
-  if (quickbooksItemHasInventoryFields(item)) {
-    return {
-      skipped: true,
-      reason:
-        "Ignored QuickBooks item webhook inventory fields because Medusa is the inventory source of truth.",
-      source_of_truth: QUICKBOOKS_INVENTORY_SOURCE_OF_TRUTH,
-      inventory: quickbooksItemInventorySnapshot(item),
-    }
-  }
+  const priceAmount = asRecord(usdPrice)?.amount
 
   return {
-    skipped: false,
-    reason: null,
-    source_of_truth: QUICKBOOKS_INVENTORY_SOURCE_OF_TRUTH,
-    inventory: null,
+    sku: normalizeSku(firstVariant?.sku),
+    name: typeof product.title === "string" ? product.title.trim() : "",
+    description:
+      typeof product.description === "string" ? product.description.trim() : "",
+    price: normalizeAmount(
+      typeof priceAmount === "number" ? priceAmount / 100 : priceAmount
+    ),
+  }
+}
+
+export const hashProductPayload = (value: Record<string, unknown>) =>
+  createHash("sha256").update(JSON.stringify(value)).digest("hex")
+
+export const toXeroItemPayload = (
+  medusaProduct: Record<string, unknown>,
+  incomeAccountCode: string,
+  existingXeroItemCode?: string | null
+) => {
+  const variants = Array.isArray(medusaProduct.variants)
+    ? medusaProduct.variants
+    : []
+  const firstVariant = asRecord(variants[0])
+  const prices = Array.isArray(firstVariant?.prices) ? firstVariant.prices : []
+  const usdPrice = prices.find(
+    (p) => asRecord(p)?.currency_code === "usd"
+  )
+  const priceAmount = asRecord(usdPrice)?.amount
+
+  const sku = normalizeSku(firstVariant?.sku) || normalizeSku(medusaProduct.id)
+  const unitPrice = normalizeAmount(
+    typeof priceAmount === "number" ? priceAmount / 100 : priceAmount
+  )
+
+  const code = existingXeroItemCode || sku
+
+  return {
+    code,
+    name:
+      typeof medusaProduct.title === "string"
+        ? medusaProduct.title.trim()
+        : "Unnamed Product",
+    description:
+      typeof medusaProduct.description === "string"
+        ? medusaProduct.description.trim()
+        : undefined,
+    salesDetails: {
+      unitPrice,
+      accountCode: incomeAccountCode,
+      taxType: "OUTPUT",
+    },
+    isSold: true,
+    isPurchased: false,
   }
 }

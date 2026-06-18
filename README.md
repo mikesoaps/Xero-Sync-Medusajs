@@ -1,16 +1,12 @@
 <div align="center">
-  <img src="https://github.com/luckycrm/Quickbooks-Sync-Medusajs/raw/main/screenshot/quickbooksmedusa.png" width="1200">
-</div>
 
-<div align="center">
+# xero-sync-medusajs
 
-# quickbooks-sync-medusajs
+**Sync Medusa.js orders, customers, and products with Xero — in real time.**
 
-**Sync Medusa.js orders, customers, and products with QuickBooks Online — in real time.**
-
-[![npm version](https://img.shields.io/npm/v/quickbooks-sync-medusajs?style=flat-square)](https://www.npmjs.com/package/quickbooks-sync-medusajs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
-[![Medusa v2](https://img.shields.io/badge/Medusa-v2-blueviolet?style=flat-square)](https://medusajs.com)
+[![Medusa 2.13.6](https://img.shields.io/badge/Medusa-2.13.6-blueviolet?style=flat-square)](https://medusajs.com)
+[![Xero](https://img.shields.io/badge/Xero-API-1AB4D7?style=flat-square)](https://developer.xero.com)
 
 </div>
 
@@ -20,11 +16,11 @@
 
 | Feature | Description |
 |---|---|
-| 🛒 **Order Sync** | Sync Medusa orders to QuickBooks as Sales Receipts or Invoices |
-| 👥 **Customer Sync** | Bidirectional customer sync between Medusa and QuickBooks |
-| 📦 **Product Sync** | Push Medusa products to QuickBooks as Items, and pull QB Items back |
-| 🔗 **OAuth 2.0** | Full QuickBooks OAuth 2.0 connect / disconnect flow |
-| 🔔 **Webhooks** | Real-time webhook handler — QB → Medusa for customers and products |
+| 🛒 **Order Sync** | Sync Medusa orders to Xero as Invoices (Accounts Receivable) |
+| 👥 **Customer Sync** | Bidirectional customer sync between Medusa and Xero Contacts |
+| 📦 **Product Sync** | Push Medusa products to Xero as Items, and pull Xero Items back |
+| 🔗 **OAuth 2.0** | Full Xero OAuth 2.0 connect / disconnect flow |
+| 🔔 **Webhooks** | Real-time webhook handler — Xero → Medusa for contacts and items |
 | ⚡ **Event Subscribers** | Auto-sync on `customer.created`, `customer.updated`, `customer.deleted` |
 | 🖥️ **Admin UI** | Built-in Admin dashboard widget and settings page |
 | ♻️ **Reset / Re-sync** | Clear sync history and re-run a full sync at any time |
@@ -33,16 +29,59 @@
 
 ## Requirements
 
-- Medusa v2 (2.x)
+- Medusa 2.13.6 or later
 - Node.js ≥ 20
-- A [QuickBooks Online](https://developer.intuit.com/) developer account with an app (OAuth 2.0)
+- pnpm ≥ 9
+- A [Xero Developer](https://developer.xero.com/) account with an OAuth 2.0 app
 
 ---
 
-## Installation
+## Local Installation (without publishing to npm)
+
+Medusa supports loading plugins directly from a local path — no package registry needed. See the [Medusa plugin docs](https://docs.medusajs.com/learn/fundamentals/plugins/create) for background.
+
+### Step 1 — Clone the plugin
 
 ```bash
-npm i quickbooks-sync-medusajs
+git clone https://github.com/mikesoaps/Xero-Sync-Medusajs.git
+cd Xero-Sync-Medusajs
+```
+
+### Step 2 — Install dependencies and build
+
+```bash
+pnpm install
+pnpm build
+```
+
+> The build output is placed in `.medusa/server`.
+
+### Step 3 — Add the plugin to your Medusa project
+
+From inside your **Medusa project** directory, add the plugin as a local dependency:
+
+```bash
+pnpm add ../Xero-Sync-Medusajs
+```
+
+This records `"xero-sync-medusajs": "file:../Xero-Sync-Medusajs"` (relative path) in your project's `package.json` — no npm publishing required.
+
+> **Adjust the path** `../Xero-Sync-Medusajs` to wherever you cloned the plugin relative to your Medusa project.
+
+### Step 4 — Re-building after changes
+
+When you make changes to the plugin source, rebuild it:
+
+```bash
+# In the plugin directory
+pnpm build
+```
+
+Then reinstall in your Medusa project so the updated build is picked up:
+
+```bash
+# In your Medusa project directory
+pnpm install
 ```
 
 ---
@@ -51,22 +90,24 @@ npm i quickbooks-sync-medusajs
 
 ### 1. Environment Variables
 
-Add the following to your `.env` file:
+Add the following to your Medusa project's `.env` file:
 
 ```env
-# QuickBooks OAuth 2.0 credentials (from your Intuit developer app)
-QUICKBOOKS_CLIENT_ID=your_client_id
-QUICKBOOKS_CLIENT_SECRET=your_client_secret
+# Xero OAuth 2.0 credentials (from your Xero Developer app)
+XERO_CLIENT_ID=your_client_id
+XERO_CLIENT_SECRET=your_client_secret
 
-# Webhook verification (from your Intuit developer app → Webhooks section)
-QUICKBOOKS_WEBHOOK_VERIFIER_TOKEN=your_webhook_verifier_token
+# Optional: override the callback URL (auto-built from MEDUSA_BACKEND_URL if not set)
+# XERO_REDIRECT_URI=https://your-medusa-backend.com/admin/xero/callback
 
-# Set to "sandbox" for development, "production" for live
-QUICKBOOKS_ENVIRONMENT=sandbox
+# Xero webhook signing key (from your Xero Developer app → Webhooks)
+XERO_WEBHOOK_KEY=your_webhook_key
 
-# Your Medusa backend public URL (used to build the OAuth callback URL)
+# Your Medusa backend public URL
 MEDUSA_BACKEND_URL=https://your-medusa-backend.com
 ```
+
+> **Local development:** Set `MEDUSA_BACKEND_URL=http://localhost:9000`. The plugin will build the redirect URI automatically as `http://localhost:9000/admin/xero/callback`.
 
 ### 2. Register the Plugin in `medusa-config.ts`
 
@@ -77,10 +118,8 @@ import { defineConfig } from "@medusajs/framework/utils"
 export default defineConfig({
   plugins: [
     {
-      resolve: "quickbooks-sync-medusajs",
-      options: {
-        // No additional options required — all config is via environment variables
-      },
+      resolve: "xero-sync-medusajs",
+      options: {},
     },
   ],
 })
@@ -88,77 +127,79 @@ export default defineConfig({
 
 ### 3. Run Migrations
 
-The plugin creates its own database tables to track sync state (connection tokens, customer links, order links). Run migrations after installation:
+The plugin creates its own database tables to track sync state. Run migrations after adding the plugin:
 
 ```bash
-npx medusa db:migrate
+pnpm medusa db:migrate
 ```
+
+This creates the following tables:
+- `xero_connection` — stores the OAuth token and tenant ID
+- `xero_contact_link` — maps Medusa customers ↔ Xero Contacts
+- `xero_invoice_link` — maps Medusa orders ↔ Xero Invoices
+- `xero_item_link` — maps Medusa products ↔ Xero Items
 
 ---
 
-## OAuth Setup (Connect to QuickBooks)
+## OAuth Setup (Connect to Xero)
 
-### Setting Up Your Intuit App
+### Step 1 — Create a Xero OAuth 2.0 App
 
-1. Go to [Intuit Developer Portal](https://developer.intuit.com/app/developer/dashboard)
-2. Create a new app → select **QuickBooks Online and Payments**
-3. Under **Keys & OAuth**, copy your **Client ID** and **Client Secret** into `.env`
-4. Add the following **Redirect URI** to your app:
+1. Go to [Xero Developer Portal](https://developer.xero.com/app/manage)
+2. Click **New App**
+3. Fill in:
+   - **App name**: anything you like
+   - **Integration type**: Web App
+   - **Company or application URL**: your Medusa backend URL
+   - **Redirect URI**: `https://your-medusa-backend.com/admin/xero/callback`
 
-```
-https://your-medusa-backend.com/admin/quickbooks/callback
-```
+   > For local development: `http://localhost:9000/admin/xero/callback`
 
-> For local development use: `http://localhost:9000/admin/quickbooks/callback`
+4. Once created, copy the **Client ID** and **Client Secret** into your `.env`
 
-### Connecting via the Admin Dashboard
+### Step 2 — Connect via the Admin Dashboard
 
 Once the plugin is installed and your env vars are set:
 
-1. Open your Medusa Admin → **Settings → QuickBooks**
-2. Click **Connect to QuickBooks**
-3. Complete the Intuit OAuth flow
-4. Select your **Income Account** for product mapping
-5. Done — the plugin will begin syncing automatically
+1. Open your Medusa Admin → **Settings → Xero**
+2. Click **Connect to Xero**
+3. Complete the Xero OAuth flow (you'll be redirected to Xero to authorise)
+4. After authorising, you'll be redirected back and the connection will be saved
+5. Select your **Income Account** (Xero account code) for product mapping
+6. Done — the plugin will begin syncing automatically on events
 
 ---
 
 ## Webhook Setup
 
-Webhooks allow QuickBooks to push changes (new/updated customers, products) to Medusa in real time.
+Xero webhooks allow Xero to push Contact and Item changes to Medusa in real time.
 
 ### Webhook Endpoint
 
 ```
-POST https://your-medusa-backend.com/quickbooks/webhooks
+POST https://your-medusa-backend.com/xero/webhooks
 ```
 
-### Registering the Webhook in Intuit
+### Registering the Webhook in Xero
 
-1. Go to your app in the [Intuit Developer Portal](https://developer.intuit.com/app/developer/dashboard)
-2. Navigate to **Webhooks** → **Add Endpoint**
-3. Enter the webhook URL above
-4. Select the following entities:
-
-| Entity | Events |
-|---|---|
-| **Customer** | Create, Update, Delete |
-| **Item** | Create, Update |
-
-5. Copy the **Verifier Token** shown and add it to your `.env`:
+1. In the [Xero Developer Portal](https://developer.xero.com/app/manage), open your app
+2. Navigate to **Webhooks**
+3. Enter the webhook URL above and click **Save**
+4. Xero will display a **Webhook key** — copy it into your `.env`:
 
 ```env
-QUICKBOOKS_WEBHOOK_VERIFIER_TOKEN=your_verifier_token
+XERO_WEBHOOK_KEY=your_webhook_key
 ```
 
-> The plugin verifies the `Intuit-Signature` header on every incoming webhook request. Invalid signatures are rejected with a `401`.
+5. Click **Send "intent to receive"** — Xero sends a validation request to your endpoint. The plugin will respond correctly if `XERO_WEBHOOK_KEY` is set.
+
+> The plugin verifies the `x-xero-signature` header on every incoming request using HMAC-SHA256. Requests with invalid signatures are rejected with `401`.
 
 ### What Webhooks Handle
 
-| QB Entity | Operation | Medusa Action |
+| Xero Entity | Operation | Medusa Action |
 |---|---|---|
-| `Customer` | Create / Update | Upsert customer in Medusa |
-| `Customer` | Delete | Remove customer from Medusa |
+| `Contact` | Create / Update | Upsert customer in Medusa |
 | `Item` | Create / Update | Upsert product in Medusa |
 
 ---
@@ -167,112 +208,135 @@ QUICKBOOKS_WEBHOOK_VERIFIER_TOKEN=your_verifier_token
 
 ### Orders
 
-Medusa orders are synced to QuickBooks as **Sales Receipts** (paid) or **Invoices** (unpaid). The plugin maps:
+Medusa orders are synced to Xero as **Invoices** (`ACCREC` — Accounts Receivable). The plugin maps:
 
-- Line items → QB line items with quantity and unit price
-- Tax → `TxnTaxDetail` / native QB tax codes
-- Customer → linked QB customer record
+- Line items → Xero invoice line items with quantity, unit price, and account code
 - Shipping → separate line item
+- Discounts → negative line item
+- Taxes → per-line tax amounts
+- Customer → linked Xero Contact (created if not yet linked)
+- Currency → passed through from the Medusa order
+
+> Orders are created in `AUTHORISED` status in Xero so they appear in accounts receivable immediately.
 
 ### Customers
 
-Bidirectional sync. You can push all Medusa customers to QuickBooks, pull all QB customers into Medusa, or let the event subscribers handle it automatically on create/update/delete.
+Bidirectional sync between Medusa customers and Xero Contacts. You can:
+
+- Push all Medusa customers to Xero (`direction: "medusa_to_xero"`)
+- Pull all Xero Contacts into Medusa (`direction: "xero_to_medusa"`, the default)
+- Let the event subscribers handle it automatically on customer create / update / delete
+
+When a Medusa customer is deleted, the corresponding Xero Contact is **archived** (Xero does not support hard-deletes of Contacts).
 
 ### Products
 
-Medusa products / variants are synced to QuickBooks as **Items** (type: `Service` or `NonInventory`). You must select an **Income Account** in the QuickBooks settings after connecting.
+Medusa products / variants are synced to Xero as **Items**. The plugin uses the variant SKU as the Xero item `Code`. You must select an **Income Account** (by Xero account code, e.g. `200`) in the Xero settings page after connecting — this account is used as the sales account on all synced items.
 
 ---
 
 ## Admin UI
 
-The plugin ships with:
+The plugin ships with two built-in admin extensions (no extra setup needed):
 
-- A **Settings page** at `/app/settings/quickbooks` — connect/disconnect, view connection status, configure income account
-- A **Dashboard widget** — quick overview of sync status
-
-No additional setup is needed; the admin extensions are bundled automatically.
+- **Settings page** at `/app/settings/xero` — connect/disconnect Xero, view tenant and token info, select income account
+- **Xero dashboard pages** at `/app/xero/` — quick overview and manual sync triggers for customers, orders, and products
 
 ---
 
 ## API Reference
 
-All endpoints are under `/admin/quickbooks` and require an authenticated Medusa admin session.
+All `/admin/xero/*` endpoints require an authenticated Medusa admin session (Bearer token or session cookie).
 
 ### Connection
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/admin/quickbooks/connect` | Get OAuth authorization URL |
-| `GET` | `/admin/quickbooks/callback` | OAuth callback (redirect from Intuit) |
-| `POST` | `/admin/quickbooks/disconnect` | Disconnect QuickBooks |
-| `GET` | `/admin/quickbooks/status` | Connection status and token info |
-| `GET` | `/admin/quickbooks/company` | Fetch connected QB company info |
+| `GET` | `/admin/xero/connect` | Returns the Xero OAuth authorisation URL |
+| `GET` | `/admin/xero/callback` | OAuth callback — called by Xero after authorisation |
+| `POST` | `/admin/xero/disconnect` | Revoke token and clear the stored connection |
+| `GET` | `/admin/xero/status` | Connection status, token expiry, organisation info, and income accounts |
+
+### Organisation
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/admin/xero/organisation` | Fetch the connected Xero organisation details |
 
 ### Sync
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/admin/quickbooks/orders/sync` | Sync one, many, or all orders |
-| `GET` | `/admin/quickbooks/orders/status` | Order sync status |
-| `POST` | `/admin/quickbooks/customers/sync` | Sync customers (bidirectional) |
-| `GET` | `/admin/quickbooks/customers/status` | Customer sync status |
-| `POST` | `/admin/quickbooks/products/sync` | Sync one, many, or all products |
-| `GET` | `/admin/quickbooks/products/status` | Product sync status |
-| `POST` | `/admin/quickbooks/products/:productId/sync` | Sync a single product by ID |
+| `POST` | `/admin/xero/orders/sync` | Sync all or specific orders to Xero |
+| `GET` | `/admin/xero/orders/status` | Order sync status and link counts |
+| `POST` | `/admin/xero/customers/sync` | Sync customers (bidirectional) |
+| `GET` | `/admin/xero/customers/status` | Customer sync status and link counts |
+| `POST` | `/admin/xero/products/sync` | Sync all or specific products to Xero |
+| `GET` | `/admin/xero/products/status` | Product sync status and link counts |
+| `POST` | `/admin/xero/products/:productId/sync` | Sync a single product by Medusa product ID |
 
 ### Settings & Utilities
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/admin/quickbooks/settings` | Set income account for product mapping |
-| `POST` | `/admin/quickbooks/reset` | Clear sync history (`orders`, `customers`, or `all`) |
+| `POST` | `/admin/xero/settings` | Set the Xero income account code for product mapping |
+| `POST` | `/admin/xero/reset` | Clear sync history (`orders`, `customers`, or `all`) |
 
-### Webhooks (Public)
+### Webhooks (Public — no auth required)
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/quickbooks/webhooks` | Receive real-time events from QuickBooks |
+| `POST` | `/xero/webhooks` | Receive real-time push events from Xero |
 
 ---
 
-### Order Sync Body
+## Request Bodies
+
+### Customer Sync
 
 ```json
+// Xero → Medusa (default)
+{ "direction": "xero_to_medusa" }
+
+// Medusa → Xero
+{ "direction": "medusa_to_xero" }
+```
+
+### Order Sync
+
+```json
+// Sync all orders
+{}
+
 // Sync specific orders
 { "order_ids": ["ord_01...", "ord_02..."] }
-
-// Sync all completed orders
-{ "sync_all": true }
 ```
 
-### Customer Sync Body
+### Product Sync
 
 ```json
-// QuickBooks → Medusa (default)
-{ "direction": "quickbooks_to_medusa" }
+// Sync all products
+{}
 
-// Medusa → QuickBooks
-{ "direction": "medusa_to_quickbooks" }
-```
-
-### Product Sync Body
-
-```json
 // Sync specific products
 { "product_ids": ["prod_01...", "prod_02..."] }
-
-// Sync all products
-{ "sync_all": true }
 ```
 
-### Reset Body
+### Settings — Set Income Account
 
 ```json
-// Clear order sync history
+{ "xero_product_income_account_code": "200" }
+```
+
+> `200` is the default Xero Sales account. Use `GET /admin/xero/status` to list all available income accounts and their codes.
+
+### Reset Sync History
+
+```json
+// Clear order sync links
 { "type": "orders" }
 
-// Clear customer sync history
+// Clear customer sync links
 { "type": "customers" }
 
 // Clear everything
@@ -283,16 +347,35 @@ All endpoints are under `/admin/quickbooks` and require an authenticated Medusa 
 
 ## Event Subscribers
 
-The plugin automatically listens to the following Medusa events and syncs to QuickBooks without any additional setup:
+The plugin automatically listens to Medusa customer events and syncs to Xero with no additional setup:
 
 | Event | Action |
 |---|---|
-| `customer.created` | Create customer in QuickBooks |
-| `customer.updated` | Update customer in QuickBooks |
-| `customer.deleted` | Delete/deactivate customer in QuickBooks |
+| `customer.created` | Create Contact in Xero |
+| `customer.updated` | Update Contact in Xero |
+| `customer.deleted` | Archive Contact in Xero |
+
+---
+
+## Troubleshooting
+
+### "Xero is not configured" error
+Ensure `XERO_CLIENT_ID` and `XERO_CLIENT_SECRET` are set in your `.env` and the Medusa server has been restarted.
+
+### OAuth redirect URI mismatch
+The redirect URI registered in your Xero app must exactly match the one the plugin builds. Check `GET /admin/xero/status` — the response includes `redirectUri` showing the value the plugin is using.
+
+### Token expired / refresh fails
+Xero access tokens expire after 30 minutes; refresh tokens expire after 60 days of inactivity. If the refresh token has expired, disconnect and reconnect via the admin settings page.
+
+### Webhook intent-to-receive fails
+The webhook endpoint must be publicly reachable. For local development, use a tunnelling tool like [ngrok](https://ngrok.com/) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) to expose `localhost:9000`.
+
+### Products have no income account
+After connecting to Xero, go to **Settings → Xero** in the Medusa Admin and select an income account. Without this, product sync will use the default account code `200` (Sales). If your Xero organisation does not have account `200`, the sync may fail until an account is selected.
 
 ---
 
 ## License
 
-MIT © [luckycrm](https://github.com/luckycrm)
+MIT

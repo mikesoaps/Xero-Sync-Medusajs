@@ -1,19 +1,19 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 
-import { deleteMedusaCustomerFromQuickbooks } from "../lib/customer-sync-service"
+import { deleteMedusaCustomerFromXero } from "../lib/customer-sync-service"
 
 export default async function customerDeletedHandler({
   event: { data },
   container,
 }: SubscriberArgs<{ id: string }>) {
-  const result = await deleteMedusaCustomerFromQuickbooks(container, data.id)
+  const result = await deleteMedusaCustomerFromXero(container, data.id)
 
-  console.log("[quickbooks-customer-sync] medusa->quickbooks deleted", result)
+  console.log("[xero-customer-sync] medusa->xero deleted", result)
 }
 
 export const config: SubscriberConfig = {
   event: "customer.deleted",
   context: {
-    subscriberId: "quickbooks-sync-customer-deleted-handler",
+    subscriberId: "xero-sync-customer-deleted-handler",
   },
 }

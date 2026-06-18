@@ -4,7 +4,7 @@ export default defineMiddlewares({
   routes: [
     {
       method: ["POST"],
-      matcher: "/quickbooks/webhooks",
+      matcher: "/xero/webhooks",
       bodyParser: {
         preserveRawBody: true,
       },

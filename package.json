@@ -1,7 +1,7 @@
 {
-  "name": "quickbooks-sync-medusajs",
+  "name": "xero-sync-medusajs",
   "version": "1.0.6",
-  "description": "Synchronize Medusa.js orders , customers and products with QuickBooks Online.",
+  "description": "Synchronize Medusa.js orders, customers and products with Xero accounting.",
   "license": "MIT",
   "files": [
     ".medusa/server"
@@ -69,8 +69,7 @@
   "packageManager": "yarn@4.4.0",
   "dependencies": {
     "axios": "^1.7.9",
-    "intuit-oauth": "^4.2.2",
-    "node-quickbooks": "^2.0.48",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "xero-node": "^15.0.1"
   }
 }

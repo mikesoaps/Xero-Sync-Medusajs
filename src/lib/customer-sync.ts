@@ -14,17 +14,7 @@ export const normalizeEmail = (value: unknown) =>
 export const normalizePhone = (value: unknown) =>
   typeof value === "string" ? value.replace(/\D/g, "") : ""
 
-export const formatPhoneForQuickbooks = (value: unknown) => {
-  const digits = normalizePhone(value)
-
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  }
-
-  return digits || null
-}
-
-export const parseQuickbooksNotes = (value: unknown) => {
+export const parseXeroContactNotes = (value: unknown) => {
   if (typeof value !== "string" || !value.trim()) {
     return null
   }
@@ -37,7 +27,7 @@ export const parseQuickbooksNotes = (value: unknown) => {
   }
 }
 
-export const buildQuickbooksNotes = (medusaCustomer: Record<string, unknown>) =>
+export const buildXeroContactNotes = (medusaCustomer: Record<string, unknown>) =>
   JSON.stringify({
     medusa_id: medusaCustomer.id || null,
     has_account: medusaCustomer.has_account ?? false,
@@ -57,71 +47,71 @@ export const normalizeMedusaCustomerForSync = (
   phone: normalizePhone(customer.phone),
 })
 
-export const normalizeQuickbooksCustomerForSync = (
-  customer: Record<string, unknown>
-) => ({
-  email: normalizeEmail(asRecord(customer.PrimaryEmailAddr)?.Address),
-  first_name: typeof customer.GivenName === "string" ? customer.GivenName.trim() : "",
-  last_name: typeof customer.FamilyName === "string" ? customer.FamilyName.trim() : "",
-  company_name:
-    typeof customer.CompanyName === "string" ? customer.CompanyName.trim() : "",
-  phone: normalizePhone(asRecord(customer.PrimaryPhone)?.FreeFormNumber),
-})
+export const normalizeXeroContactForSync = (
+  contact: Record<string, unknown>
+) => {
+  const phones = Array.isArray(contact.phones) ? contact.phones : []
+  const defaultPhone = phones.find(
+    (p) => asRecord(p)?.phoneType === "DEFAULT"
+  ) || phones[0]
+
+  return {
+    email: normalizeEmail(contact.emailAddress),
+    first_name: typeof contact.firstName === "string" ? contact.firstName.trim() : "",
+    last_name: typeof contact.lastName === "string" ? contact.lastName.trim() : "",
+    company_name: typeof contact.name === "string" ? contact.name.trim() : "",
+    phone: normalizePhone(asRecord(defaultPhone)?.phoneNumber),
+  }
+}
 
 export const hashCustomerPayload = (value: Record<string, unknown>) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex")
 
-export const toQuickbooksCustomerPayload = (
+export const toXeroContactPayload = (
   medusaCustomer: Record<string, unknown>,
-  existingQuickbooksCustomer?: Record<string, unknown> | null,
-  options?: {
-    metadataOnly?: boolean
-  }
+  existingXeroContact?: Record<string, unknown> | null
 ) => {
+  const firstName = typeof medusaCustomer.first_name === "string" ? medusaCustomer.first_name.trim() : ""
+  const lastName = typeof medusaCustomer.last_name === "string" ? medusaCustomer.last_name.trim() : ""
+  const fullName =
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    (typeof medusaCustomer.email === "string" ? medusaCustomer.email : "Unknown")
+
   const payload: Record<string, unknown> = {
-    Notes: buildQuickbooksNotes(medusaCustomer),
+    name: fullName,
+    firstName: firstName || undefined,
+    lastName: lastName || undefined,
+    emailAddress: medusaCustomer.email || undefined,
   }
 
-  if (!options?.metadataOnly) {
-    const formattedPhone = formatPhoneForQuickbooks(medusaCustomer.phone)
-
-    payload.GivenName = medusaCustomer.first_name || undefined
-    payload.FamilyName = medusaCustomer.last_name || undefined
-    payload.CompanyName = medusaCustomer.company_name || undefined
-    payload.DisplayName =
-      [medusaCustomer.first_name, medusaCustomer.last_name]
-        .filter(Boolean)
-        .join(" ") || medusaCustomer.email
-    payload.PrimaryEmailAddr = medusaCustomer.email
-      ? { Address: medusaCustomer.email }
-      : undefined
-    payload.PrimaryPhone = formattedPhone
-      ? { FreeFormNumber: formattedPhone }
-      : undefined
+  const phone = normalizePhone(medusaCustomer.phone)
+  if (phone) {
+    payload.phones = [{ phoneType: "DEFAULT", phoneNumber: phone }]
   }
 
-  if (existingQuickbooksCustomer?.Id) {
-    payload.Id = existingQuickbooksCustomer.Id
-    payload.SyncToken = existingQuickbooksCustomer.SyncToken
-    payload.sparse = true
+  if (existingXeroContact?.contactID) {
+    payload.contactID = existingXeroContact.contactID
   }
 
   return payload
 }
 
-export const toMedusaCustomerInput = (quickbooksCustomer: Record<string, unknown>) => ({
-  email: normalizeEmail(asRecord(quickbooksCustomer.PrimaryEmailAddr)?.Address) || null,
-  first_name:
-    typeof quickbooksCustomer.GivenName === "string"
-      ? quickbooksCustomer.GivenName.trim()
-      : null,
-  last_name:
-    typeof quickbooksCustomer.FamilyName === "string"
-      ? quickbooksCustomer.FamilyName.trim()
-      : null,
-  company_name:
-    typeof quickbooksCustomer.CompanyName === "string"
-      ? quickbooksCustomer.CompanyName.trim()
-      : null,
-  phone: normalizePhone(asRecord(quickbooksCustomer.PrimaryPhone)?.FreeFormNumber) || null,
-})
+export const toMedusaCustomerInputFromXero = (xeroContact: Record<string, unknown>) => {
+  const phones = Array.isArray(xeroContact.phones) ? xeroContact.phones : []
+  const defaultPhone =
+    phones.find((p) => asRecord(p)?.phoneType === "DEFAULT") || phones[0]
+
+  return {
+    email: normalizeEmail(xeroContact.emailAddress) || null,
+    first_name:
+      typeof xeroContact.firstName === "string"
+        ? xeroContact.firstName.trim()
+        : null,
+    last_name:
+      typeof xeroContact.lastName === "string"
+        ? xeroContact.lastName.trim()
+        : null,
+    company_name: null,
+    phone: normalizePhone(asRecord(defaultPhone)?.phoneNumber) || null,
+  }
+}
